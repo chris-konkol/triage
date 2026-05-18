@@ -1,0 +1,132 @@
+syntax = "proto3";
+
+package ticket.v1;
+
+option go_package = "github.com/chris-konkol/triage/gen/ticket/v1;ticketv1";
+
+import "google/protobuf/timestamp.proto";
+
+enum Priority {
+  PRIORITY_UNSPECIFIED = 0;
+  PRIORITY_LOW = 1;
+  PRIORITY_MEDIUM = 2;
+  PRIORITY_HIGH = 3;
+  PRIORITY_CRITICAL = 4;
+}
+
+enum Status {
+  STATUS_UNSPECIFIED = 0;
+  STATUS_OPEN = 1;
+  STATUS_IN_PROGRESS = 2;
+  STATUS_WAITING = 3;
+  STATUS_RESOLVED = 4;
+  STATUS_CLOSED = 5;
+}
+
+enum Category {
+  CATEGORY_UNSPECIFIED = 0;
+  CATEGORY_BUG = 1;
+  CATEGORY_FEATURE_REQUEST = 2;
+  CATEGORY_SUPPORT = 3;
+  CATEGORY_DOCUMENTATION = 4;
+  CATEGORY_INFRASTRUCTURE = 5;
+}
+
+message Ticket {
+  string id = 1;
+  string title = 2;
+  string description = 3;
+  Priority priority = 4;
+  Status status = 5;
+  Category category = 6;
+  string created_by = 7;
+  string assigned_to = 8;
+  google.protobuf.Timestamp created_at = 9;
+  google.protobuf.Timestamp updated_at = 10;
+  google.protobuf.Timestamp resolved_at = 11;
+  repeated string tags = 12;
+}
+
+message Comment {
+  string id = 1;
+  string ticket_id = 2;
+  string author = 3;
+  string body = 4;
+  google.protobuf.Timestamp created_at = 5;
+}
+
+message CreateTicketRequest {
+  string title = 1;
+  string description = 2;
+  Priority priority = 3;
+  Category category = 4;
+  string assigned_to = 5;
+  repeated string tags = 6;
+}
+
+message CreateTicketResponse {
+  Ticket ticket = 1;
+}
+
+message GetTicketRequest {
+  string id = 1;
+}
+
+message GetTicketResponse {
+  Ticket ticket = 1;
+  repeated Comment comments = 2;
+}
+
+message ListTicketsRequest {
+  Status status_filter = 1;
+  Priority priority_filter = 2;
+  Category category_filter = 3;
+  string assigned_to_filter = 4;
+  int32 page = 5;
+  int32 page_size = 6;
+  string search_query = 7;
+}
+
+message ListTicketsResponse {
+  repeated Ticket tickets = 1;
+  int32 total_count = 2;
+}
+
+message UpdateTicketRequest {
+  string id = 1;
+  optional string title = 2;
+  optional string description = 3;
+  optional Priority priority = 4;
+  optional Status status = 5;
+  optional Category category = 6;
+  optional string assigned_to = 7;
+  repeated string tags = 8;
+}
+
+message UpdateTicketResponse {
+  Ticket ticket = 1;
+}
+
+message DeleteTicketRequest {
+  string id = 1;
+}
+
+message DeleteTicketResponse {}
+
+message AddCommentRequest {
+  string ticket_id = 1;
+  string body = 2;
+}
+
+message AddCommentResponse {
+  Comment comment = 1;
+}
+
+service TicketService {
+  rpc CreateTicket(CreateTicketRequest) returns (CreateTicketResponse);
+  rpc GetTicket(GetTicketRequest) returns (GetTicketResponse);
+  rpc ListTickets(ListTicketsRequest) returns (ListTicketsResponse);
+  rpc UpdateTicket(UpdateTicketRequest) returns (UpdateTicketResponse);
+  rpc DeleteTicket(DeleteTicketRequest) returns (DeleteTicketResponse);
+  rpc AddComment(AddCommentRequest) returns (AddCommentResponse);
+}

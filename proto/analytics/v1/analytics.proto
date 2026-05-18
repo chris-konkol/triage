@@ -1,0 +1,38 @@
+syntax = "proto3";
+
+package analytics.v1;
+
+option go_package = "github.com/chris-konkol/triage/gen/analytics/v1;analyticsv1";
+
+message GetDashboardStatsRequest {}
+
+message GetDashboardStatsResponse {
+  int32 total_open = 1;
+  int32 total_in_progress = 2;
+  int32 total_resolved = 3;
+  int32 total_closed = 4;
+  double avg_resolution_hours = 5;
+  repeated CategoryCount tickets_by_category = 6;
+  repeated PriorityCount tickets_by_priority = 7;
+  repeated DailyCount tickets_per_day = 8;
+}
+
+message CategoryCount {
+  string category = 1;
+  int32 count = 2;
+}
+
+message PriorityCount {
+  string priority = 1;
+  int32 count = 2;
+}
+
+message DailyCount {
+  string date = 1;
+  int32 created = 2;
+  int32 resolved = 3;
+}
+
+service AnalyticsService {
+  rpc GetDashboardStats(GetDashboardStatsRequest) returns (GetDashboardStatsResponse);
+}

@@ -1,0 +1,7 @@
+syntax = "proto3";
+
+package notification.v1;
+
+option go_package = "github.com/chris-konkol/triage/gen/notification/v1;notificationv1";
+
+// Notification service is a Kafka consumer — no RPC surface in Phase 1.
