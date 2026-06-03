@@ -1,0 +1,278 @@
+version: "3.9"
+
+# proxy is the external Docker network managed by Nginx Proxy Manager.
+# Create it once with: docker network create proxy
+# Then add this stack's name to your NPM proxy host forward.
+networks:
+  internal:
+    driver: bridge
+    name: triage_internal
+  proxy:
+    external: true
+
+services:
+  # ── Infrastructure ──────────────────────────────────────────────────────────
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: tickets
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: tickets
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tickets"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - internal
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+  redpanda:
+    image: redpandadata/redpanda:latest
+    command:
+      - redpanda start
+      - --smp 1
+      - --memory 512M
+      - --reserve-memory 0M
+      - --overprovisioned
+      - --node-id 0
+      - --kafka-addr PLAINTEXT://0.0.0.0:9092
+      # Must use the container name so other services inside Docker can connect
+      - --advertise-kafka-addr PLAINTEXT://redpanda:9092
+      - --set redpanda.auto_create_topics_enabled=true
+    volumes:
+      - rpdata:/var/lib/redpanda/data
+    healthcheck:
+      test: ["CMD", "rpk", "cluster", "health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - internal
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 768M
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    command: ["--config=/etc/otel-collector.yaml"]
+    volumes:
+      - ./deploy/otel-collector.yaml:/etc/otel-collector.yaml
+    networks:
+      - internal
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
+  prometheus:
+    image: prom/prometheus:latest
+    volumes:
+      - ./deploy/prometheus.yml:/etc/prometheus/prometheus.yml
+      - promdata:/prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=30d
+      - --web.enable-remote-write-receiver
+    networks:
+      - internal
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+  tempo:
+    image: grafana/tempo:latest
+    command: ["-config.file=/etc/tempo.yaml"]
+    volumes:
+      - ./deploy/tempo.yaml:/etc/tempo.yaml
+      - tempodata:/var/tempo
+    networks:
+      - internal
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+  loki:
+    image: grafana/loki:latest
+    command: ["-config.file=/etc/loki/loki.yaml"]
+    volumes:
+      - ./deploy/loki.yaml:/etc/loki/loki.yaml
+      - lokidata:/loki
+    networks:
+      - internal
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
+  grafana:
+    image: grafana/grafana:latest
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GF_ADMIN_PASSWORD}
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_SERVER_ROOT_URL: https://grafana.${DOMAIN}
+    volumes:
+      - ./deploy/grafana/datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yaml
+      - ./deploy/grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - grafanadata:/var/lib/grafana
+    depends_on:
+      - prometheus
+      - tempo
+      - loki
+    networks:
+      - internal
+      - proxy
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
+  # ── Application services ────────────────────────────────────────────────────
+
+  ticket-svc:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE: ticket-svc
+    environment:
+      DATABASE_URL: postgres://tickets:${POSTGRES_PASSWORD}@postgres:5432/tickets?sslmode=disable
+      KAFKA_BROKERS: redpanda:9092
+      OTEL_EXPORTER_OTLP_ENDPOINT: otel-collector:4317
+      OTEL_SERVICE_NAME: ticket-svc
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redpanda:
+        condition: service_healthy
+    networks:
+      - internal
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+
+  analytics-svc:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE: analytics-svc
+    environment:
+      DATABASE_URL: postgres://tickets:${POSTGRES_PASSWORD}@postgres:5432/tickets?sslmode=disable
+      KAFKA_BROKERS: redpanda:9092
+      KAFKA_GROUP: analytics-svc
+      OTEL_EXPORTER_OTLP_ENDPOINT: otel-collector:4317
+      OTEL_SERVICE_NAME: analytics-svc
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redpanda:
+        condition: service_healthy
+    networks:
+      - internal
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+
+  audit-svc:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE: audit-svc
+    environment:
+      DATABASE_URL: postgres://tickets:${POSTGRES_PASSWORD}@postgres:5432/tickets?sslmode=disable
+      KAFKA_BROKERS: redpanda:9092
+      KAFKA_GROUP: audit-svc
+      OTEL_EXPORTER_OTLP_ENDPOINT: otel-collector:4317
+      OTEL_SERVICE_NAME: audit-svc
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redpanda:
+        condition: service_healthy
+    networks:
+      - internal
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+
+  notification-svc:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE: notification-svc
+    environment:
+      KAFKA_BROKERS: redpanda:9092
+      KAFKA_GROUP: notification-svc
+      OTEL_EXPORTER_OTLP_ENDPOINT: otel-collector:4317
+      OTEL_SERVICE_NAME: notification-svc
+    depends_on:
+      redpanda:
+        condition: service_healthy
+    networks:
+      - internal
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+
+  gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile.gateway
+    environment:
+      DATABASE_URL: postgres://tickets:${POSTGRES_PASSWORD}@postgres:5432/tickets?sslmode=disable
+      TICKET_SVC_ADDR: ticket-svc:50051
+      ANALYTICS_SVC_ADDR: analytics-svc:50052
+      JWT_SECRET: ${JWT_SECRET}
+      OTEL_EXPORTER_OTLP_ENDPOINT: otel-collector:4317
+      OTEL_SERVICE_NAME: gateway
+    depends_on:
+      postgres:
+        condition: service_healthy
+      ticket-svc:
+        condition: service_started
+      analytics-svc:
+        condition: service_started
+    networks:
+      - internal
+      - proxy
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
+volumes:
+  pgdata:
+  promdata:
+  tempodata:
+  lokidata:
+  grafanadata:
+  rpdata:
