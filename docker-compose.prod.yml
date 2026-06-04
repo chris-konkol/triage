@@ -251,6 +251,7 @@ services:
       TICKET_SVC_ADDR: ticket-svc:50051
       ANALYTICS_SVC_ADDR: analytics-svc:50052
       JWT_SECRET: ${JWT_SECRET}
+      REGISTRATION_TOKEN: ${REGISTRATION_TOKEN}
       OTEL_EXPORTER_OTLP_ENDPOINT: otel-collector:4317
       OTEL_SERVICE_NAME: gateway
     depends_on:
