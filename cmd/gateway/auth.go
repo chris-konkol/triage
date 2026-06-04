@@ -13,11 +13,17 @@ import (
 )
 
 type authHandlers struct {
-	db        *pgxpool.Pool
-	jwtSecret string
+	db                *pgxpool.Pool
+	jwtSecret         string
+	registrationToken string
 }
 
 func (h *authHandlers) register(w http.ResponseWriter, r *http.Request) {
+	if r.Header.Get("X-Registration-Token") != h.registrationToken {
+		writeError(w, http.StatusForbidden, "invalid registration token")
+		return
+	}
+
 	var req struct {
 		Username string `json:"username"`
 		Email    string `json:"email"`

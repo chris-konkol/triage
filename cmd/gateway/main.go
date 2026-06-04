@@ -71,7 +71,7 @@ func main() {
 
 	tickets := &ticketHandlers{client: ticketv1.NewTicketServiceClient(conn)}
 	analytics := &analyticsHandlers{client: analyticsv1.NewAnalyticsServiceClient(analyticsConn)}
-	authH := &authHandlers{db: pool, jwtSecret: cfg.JWTSecret}
+	authH := &authHandlers{db: pool, jwtSecret: cfg.JWTSecret, registrationToken: cfg.RegistrationToken}
 
 	r := chi.NewRouter()
 	r.Use(middleware.Recoverer)

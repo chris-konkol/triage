@@ -57,6 +57,7 @@ type Gateway struct {
 	TicketSvcAddr     string `envconfig:"TICKET_SVC_ADDR" default:"localhost:50051"`
 	AnalyticsSvcAddr  string `envconfig:"ANALYTICS_SVC_ADDR" default:"localhost:50052"`
 	JWTSecret         string `envconfig:"JWT_SECRET" default:"dev-secret-change-in-prod"`
+	RegistrationToken string `envconfig:"REGISTRATION_TOKEN" required:"true"`
 	OTELEndpoint      string `envconfig:"OTEL_EXPORTER_OTLP_ENDPOINT" default:"localhost:4317"`
 	ServiceName       string `envconfig:"OTEL_SERVICE_NAME" default:"gateway"`
 }
