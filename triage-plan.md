@@ -928,7 +928,6 @@ The gateway exposes a REST API that the React frontend consumes. Each endpoint t
 
 | Method | Path | gRPC Call | Auth Required |
 |--------|------|-----------|--------------|
-| POST | `/api/auth/register` | Direct DB (gateway handles auth) | No |
 | POST | `/api/auth/login` | Direct DB | No |
 | GET | `/api/tickets` | `TicketService.ListTickets` | Yes |
 | POST | `/api/tickets` | `TicketService.CreateTicket` | Yes |
@@ -987,7 +986,7 @@ The gateway exposes a REST API that the React frontend consumes. Each endpoint t
 
 ## Build Order (Phase by Phase)
 
-### Phase 1 — Foundation
+### ✅ Phase 1 — Foundation
 
 **Goal:** Ticket Service works standalone, testable with grpcurl. Telemetry pipeline is running.
 
@@ -1001,7 +1000,7 @@ The gateway exposes a REST API that the React frontend consumes. Each endpoint t
 8. Verify traces appear in Grafana Tempo, metrics in Prometheus
 9. Test with `grpcurl` or Evans CLI
 
-### Phase 2 — API Gateway + React Skeleton
+### ✅ Phase 2 — API Gateway + React Skeleton
 
 **Goal:** React can create and list tickets through the gateway. End-to-end traces visible in Grafana.
 
@@ -1010,10 +1009,10 @@ The gateway exposes a REST API that the React frontend consumes. Each endpoint t
 3. Scaffold React app with Vite + TypeScript
 4. Build TicketList and CreateTicket pages
 5. Wire up Tanstack Query hooks to call the gateway
-6. Add basic auth (register/login, JWT middleware)
+6. Add basic auth (login, JWT middleware) — registration removed; accounts created directly in DB
 7. Verify that a request from React creates a trace spanning gateway → ticket service → Postgres in Tempo
 
-### Phase 3 — Kafka Integration
+### ✅ Phase 3 — Kafka Integration
 
 **Goal:** Events flow through Kafka, consumers process them. Traces span from HTTP through Kafka to consumers.
 
@@ -1025,7 +1024,7 @@ The gateway exposes a REST API that the React frontend consumes. Each endpoint t
 6. Add Kafka metrics: messages produced/consumed counters, consumer lag gauge, processing duration histogram
 7. Verify in Grafana Tempo: a single trace shows HTTP → gRPC → Kafka publish → consumer processing
 
-### Phase 4 — Analytics + Dashboard
+### ✅ Phase 4 — Analytics + Dashboard
 
 **Goal:** Dashboard shows live stats derived from Kafka events.
 
@@ -1034,7 +1033,7 @@ The gateway exposes a REST API that the React frontend consumes. Each endpoint t
 3. Add `/api/dashboard` route to gateway
 4. Build React Dashboard page with Recharts
 
-### Phase 5 — Polish and Production Readiness
+### ✅ Phase 5 — Polish and Production Readiness
 
 **Goal:** System is robust, observable, and self-hostable.
 
@@ -1047,9 +1046,37 @@ The gateway exposes a REST API that the React frontend consumes. Each endpoint t
 7. Configure Grafana datasource provisioning with Tempo → Loki trace-to-logs correlation
 8. Docker Compose production profile with resource limits
 9. Configure gateway to serve React static build in production
-10. README with setup instructions (including Grafana access at :3001)
+10. README with setup instructions
 
-### Phase 6 — PWA + Web Push Notifications
+### ✅ Phase 5.5 — Homeserver Deployment
+
+**Goal:** Full stack running on homeserver, accessible via domain over HTTPS.
+
+1. `Dockerfile.gateway` — multi-stage build (Node.js frontend + Go gateway in one image)
+2. `docker-compose.prod.yml` — all services wired together, external `proxy` network for Nginx Proxy Manager
+3. `.env.example` — secret template (POSTGRES_PASSWORD, JWT_SECRET, GF_ADMIN_PASSWORD, DOMAIN)
+4. `deploy.sh` — one-command setup: builds images, starts stack, waits for Postgres, runs migrations
+5. Configure Nginx Proxy Manager proxy hosts: `triage.ckonkol.net → gateway:8080`, `grafana.ckonkol.net → grafana:3000`
+6. DNS CNAME via No-IP pointing `triage.ckonkol.net` at homeserver public IP
+7. Let's Encrypt SSL certs via NPM
+
+> **Note on telemetry stack:** The observability containers (otel-collector, prometheus, tempo, loki, grafana) are currently bundled with Triage. If other homeserver apps need shared observability in the future, extract them into a standalone `homelab-observability` repo and have each app reference that stack's network as external.
+
+### Phase 6 — MCP Server
+
+**Goal:** Claude Code can query and manage Triage tickets directly from any conversation.
+
+1. Build `cmd/mcp-svc` — a Go MCP server exposing tools over stdio transport:
+   - `list_tickets` — filter by status, priority, search query
+   - `get_ticket` — full ticket detail including comments
+   - `create_ticket` — title, description, priority, category
+   - `update_ticket` — change status, priority, assignment
+   - `get_dashboard_stats` — summary counts and averages
+2. Auth via bearer token — server reads `TRIAGE_API_URL` and `TRIAGE_TOKEN` from environment, calls the existing REST API
+3. Configure Claude Code to use the server: add to `.claude/settings.json` `mcpServers` block so it's available in every session
+4. (Optional) SSE transport variant for remote access via `mcp.ckonkol.net` through NPM
+
+### Phase 7 — PWA + Web Push Notifications
 
 **Goal:** App is installable on Android and sends real push notifications when tickets are created or changed.
 
@@ -1062,7 +1089,7 @@ The gateway exposes a REST API that the React frontend consumes. Each endpoint t
 7. Handle the push in the service worker — call `showNotification()` with the ticket title and a deep link back into the app
 8. Test end to end: create a ticket on desktop, receive a push notification on Android
 
-### Phase 7 — Stretch Goals (Optional)
+### Phase 8 — Stretch Goals (Optional)
 
 - WebSocket support for real-time ticket updates in the UI
 - File attachments (upload to local disk or S3-compatible storage like MinIO)
@@ -1071,12 +1098,6 @@ The gateway exposes a REST API that the React frontend consumes. Each endpoint t
 - Alerting rules in Grafana (e.g., alert when error rate > 5% or consumer lag > 1000)
 - gRPC streaming for live notification feed
 - CI pipeline with GitHub Actions (lint, test, build Docker images)
-- **MCP Server** (`cmd/mcp-svc`) — expose Triage data to Claude via the Model Context Protocol
-  - Tools: `list_tickets`, `get_ticket`, `get_audit_log`, `get_dashboard_stats`
-  - SSE transport so it works over the internet
-  - Bearer token auth so only authorized clients can query
-  - Add to Docker Compose and expose via Nginx Proxy Manager at `mcp.triage.ckonkol.net`
-  - Configure in `~/.claude/claude.json` so Claude Code can query live ticket data from any machine
 
 ---
 
