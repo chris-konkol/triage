@@ -11,6 +11,7 @@ bin/
 .env
 .env.*
 !.env.example
+.mcp.json
 
 # Frontend build output and dependencies
 frontend/node_modules/

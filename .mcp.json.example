@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "triage": {
+      "url": "https://mcp.ckonkol.net/sse"
+    },
+    "triage-local": {
+      "command": "C:\\src\\triage\\bin\\mcp-svc.exe",
+      "env": {
+        "TRIAGE_API_URL": "https://triage.ckonkol.net",
+        "TRIAGE_USERNAME": "your-username",
+        "TRIAGE_PASSWORD": "your-password"
+      }
+    }
+  }
+}

@@ -269,6 +269,31 @@ services:
         limits:
           memory: 256M
 
+  mcp-svc:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE: mcp-svc
+    environment:
+      TRIAGE_API_URL: http://gateway:8080
+      TRIAGE_USERNAME: ${MCP_USERNAME}
+      TRIAGE_PASSWORD: ${MCP_PASSWORD}
+      MCP_TRANSPORT: sse
+      MCP_PORT: "8090"
+      MCP_BASE_URL: https://mcp.${DOMAIN}
+    depends_on:
+      gateway:
+        condition: service_started
+    networks:
+      - internal
+      - proxy
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+
 volumes:
   pgdata:
   promdata:
