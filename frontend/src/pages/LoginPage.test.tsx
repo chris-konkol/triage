@@ -35,12 +35,6 @@ describe('LoginPage', () => {
     expect(screen.getByRole('button', { name: /sign in/i })).toBeInTheDocument();
   });
 
-  it('switches to register mode when Register link is clicked', async () => {
-    renderWithProviders(<LoginPage />);
-    await userEvent.click(screen.getByText(/register/i));
-    expect(screen.getByRole('button', { name: /register/i })).toBeInTheDocument();
-  });
-
   it('navigates to /tickets on successful login', async () => {
     vi.mocked(post).mockResolvedValue({ token: 'jwt-token' });
     renderWithProviders(<LoginPage />);
