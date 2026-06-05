@@ -142,17 +142,15 @@ func main() {
 		mcp.WithDescription("Get ticket counts by status, average resolution time, and daily ticket activity."),
 	), getDashboardStats)
 
-	if os.Getenv("MCP_TRANSPORT") == "sse" {
+	if os.Getenv("MCP_TRANSPORT") == "http" {
 		port := os.Getenv("MCP_PORT")
 		if port == "" {
 			port = "8090"
 		}
-		baseURL := os.Getenv("MCP_BASE_URL")
-		if baseURL == "" {
-			baseURL = "http://localhost:" + port
-		}
-		sseServer := server.NewSSEServer(s, server.WithBaseURL(baseURL))
-		if err := sseServer.Start(":" + port); err != nil {
+		httpServer := server.NewStreamableHTTPServer(s,
+			server.WithEndpointPath("/mcp"),
+		)
+		if err := httpServer.Start(":" + port); err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}

@@ -1,7 +1,8 @@
 {
   "mcpServers": {
     "triage": {
-      "url": "https://mcp.ckonkol.net/sse"
+      "type": "http",
+      "url": "https://mcp.ckonkol.net/mcp"
     },
     "triage-local": {
       "command": "C:\\src\\triage\\bin\\mcp-svc.exe",

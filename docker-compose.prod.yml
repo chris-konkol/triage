@@ -280,9 +280,8 @@ services:
       TRIAGE_API_URL: http://gateway:8080
       TRIAGE_USERNAME: ${MCP_USERNAME}
       TRIAGE_PASSWORD: ${MCP_PASSWORD}
-      MCP_TRANSPORT: sse
+      MCP_TRANSPORT: http
       MCP_PORT: "8090"
-      MCP_BASE_URL: https://mcp.${DOMAIN}
     depends_on:
       gateway:
         condition: service_started
