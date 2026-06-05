@@ -147,10 +147,32 @@ func main() {
 		if port == "" {
 			port = "8090"
 		}
-		httpServer := server.NewStreamableHTTPServer(s,
-			server.WithEndpointPath("/mcp"),
-		)
-		if err := httpServer.Start(":" + port); err != nil {
+
+		cfg, err := loadOAuthConfig()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+
+		mcpHandler := server.NewStreamableHTTPServer(s)
+
+		mux := http.NewServeMux()
+		mux.Handle("/.well-known/oauth-protected-resource", server.NewProtectedResourceMetadataHandler(
+			server.ProtectedResourceMetadataConfig{
+				Resource:               cfg.serverURL,
+				AuthorizationServers:   []string{cfg.serverURL},
+				ScopesSupported:        []string{"tickets:read", "tickets:write"},
+				BearerMethodsSupported: []string{"header"},
+			},
+		))
+		mux.Handle("/.well-known/oauth-authorization-server", authServerMetadataHandler(cfg))
+		mux.Handle("/oauth/authorize", authorizeHandler(cfg))
+		mux.Handle("/oauth/login", loginHandler(cfg))
+		mux.Handle("/oauth/token", tokenHandler(cfg))
+		mux.Handle("/mcp", requireBearerToken(cfg, mcpHandler))
+
+		fmt.Fprintf(os.Stderr, "mcp-svc listening on :%s\n", port)
+		if err := http.ListenAndServe(":"+port, mux); err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
@@ -160,6 +182,47 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
+}
+
+func loadOAuthConfig() (oauthConfig, error) {
+	serverURL := strings.TrimRight(os.Getenv("MCP_SERVER_URL"), "/")
+	clientID := os.Getenv("OAUTH_CLIENT_ID")
+	clientSecret := os.Getenv("OAUTH_CLIENT_SECRET")
+	jwtSecret := os.Getenv("MCP_JWT_SECRET")
+	adminUser := os.Getenv("TRIAGE_ADMIN_USER")
+	adminPassHash := os.Getenv("TRIAGE_ADMIN_PASS_HASH")
+
+	var missing []string
+	if serverURL == "" {
+		missing = append(missing, "MCP_SERVER_URL")
+	}
+	if clientID == "" {
+		missing = append(missing, "OAUTH_CLIENT_ID")
+	}
+	if clientSecret == "" {
+		missing = append(missing, "OAUTH_CLIENT_SECRET")
+	}
+	if jwtSecret == "" {
+		missing = append(missing, "MCP_JWT_SECRET")
+	}
+	if adminUser == "" {
+		missing = append(missing, "TRIAGE_ADMIN_USER")
+	}
+	if adminPassHash == "" {
+		missing = append(missing, "TRIAGE_ADMIN_PASS_HASH")
+	}
+	if len(missing) > 0 {
+		return oauthConfig{}, fmt.Errorf("missing required env vars for HTTP transport: %s", strings.Join(missing, ", "))
+	}
+
+	return oauthConfig{
+		serverURL:     serverURL,
+		clientID:      clientID,
+		clientSecret:  clientSecret,
+		jwtSecret:     []byte(jwtSecret),
+		adminUser:     adminUser,
+		adminPassHash: adminPassHash,
+	}, nil
 }
 
 // ── Auth ─────────────────────────────────────────────────────────────────────

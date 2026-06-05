@@ -282,6 +282,12 @@ services:
       TRIAGE_PASSWORD: ${MCP_PASSWORD}
       MCP_TRANSPORT: http
       MCP_PORT: "8090"
+      MCP_SERVER_URL: ${MCP_SERVER_URL}
+      OAUTH_CLIENT_ID: ${OAUTH_CLIENT_ID}
+      OAUTH_CLIENT_SECRET: ${OAUTH_CLIENT_SECRET}
+      MCP_JWT_SECRET: ${MCP_JWT_SECRET}
+      TRIAGE_ADMIN_USER: ${TRIAGE_ADMIN_USER}
+      TRIAGE_ADMIN_PASS_HASH: ${TRIAGE_ADMIN_PASS_HASH}
     depends_on:
       gateway:
         condition: service_started
