@@ -81,7 +81,7 @@ func authServerMetadataHandler(cfg oauthConfig) http.HandlerFunc {
 		"response_types_supported":              []string{"code"},
 		"grant_types_supported":                 []string{"authorization_code", "refresh_token"},
 		"code_challenge_methods_supported":       []string{"S256"},
-		"token_endpoint_auth_methods_supported":  []string{"client_secret_post"},
+		"token_endpoint_auth_methods_supported":  []string{"client_secret_basic", "client_secret_post"},
 		"scopes_supported":                      []string{"tickets:read", "tickets:write"},
 	})
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -229,7 +229,13 @@ func tokenHandler(cfg oauthConfig) http.HandlerFunc {
 			return
 		}
 
-		if r.FormValue("client_id") != cfg.clientID || r.FormValue("client_secret") != cfg.clientSecret {
+		// Accept client_secret_basic (Authorization header) or client_secret_post (form body)
+		clientID, clientSecret, hasBasic := r.BasicAuth()
+		if !hasBasic {
+			clientID = r.FormValue("client_id")
+			clientSecret = r.FormValue("client_secret")
+		}
+		if clientID != cfg.clientID || clientSecret != cfg.clientSecret {
 			writeTokenError(w, "invalid_client", "invalid client credentials")
 			return
 		}
